@@ -1,18 +1,51 @@
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TextInput, TouchableOpacity, View,Alert, ActivityIndicator } from 'react-native'
 import React, { useState } from 'react'
 import { colors } from '../utils/colors'
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Checkbox } from 'react-native-paper';
 
+import { httpsCallable } from "firebase/functions"; 
+import { functions } from '../firebaseConfig';     
+
+
 const SignupScreen2 = () => {
 
+     const route = useRoute();
+    const { email, username } = route.params;
+
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [checked, setChecked] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const navigation = useNavigation();
     
-    const handleSignup = () => {
-        navigation.navigate("signup3")
+    const handleSignup = async () => {
+        if (password !== confirmPassword) return Alert.alert("Error", "Passwords do not match.");
+        if (password.length < 10) return Alert.alert("Error", "Password must be at least 10 characters long.");
+        if (!checked) return Alert.alert("Error", "You must agree to the Terms of Service.");
+
+        setLoading(true);
+        try {
+            
+            const registerUser = httpsCallable(functions, 'user-register');
+            const result = await registerUser({
+                email: email,
+                username: username,
+                password: password,
+            });
+
+              const data = result.data;
+            console.log(data.message);
+
+             navigation.navigate("signup3", { uid: data.uid, email: email, password: password });
+         } catch (error) {
+            console.error("Function call failed:", error);
+            Alert.alert("Signup Failed", error.message);
+        } finally {
+            setLoading(false);
+        }
     }
 
 
@@ -26,6 +59,8 @@ const SignupScreen2 = () => {
                 placeholder='Password'
                 placeholderTextColor={colors.primary}
                 secureTextEntry={true}
+                value={password}
+                onChangeText={setPassword}
             />
         </View>
         <View style={styles.passwordTextContainer}>
@@ -48,6 +83,8 @@ const SignupScreen2 = () => {
                 placeholder='Re-enter password'
                 placeholderTextColor={colors.primary}
                 secureTextEntry={true}
+                  value={confirmPassword}
+                onChangeText={setConfirmPassword}
             />
         </View>
         <View style={styles.checkContainer}>
@@ -66,8 +103,9 @@ const SignupScreen2 = () => {
         <TouchableOpacity 
             style={styles.loginButton}
             onPress={handleSignup}
+             disabled={loading}
         >
-            <Text style={styles.loginText}>Sign up</Text>
+            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.loginText}>Sign up</Text>}
         </TouchableOpacity>
 
       </View>

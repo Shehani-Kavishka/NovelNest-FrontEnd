@@ -32,7 +32,7 @@ const CommentsScreen = () => {
                 style={styles.textInput}
                 placeholder="Write yout Thoughts"
                 placeholderTextColor={colors.primary}
-                secureTextEntry={true}
+                multiline={true}
               />
               
             </View>

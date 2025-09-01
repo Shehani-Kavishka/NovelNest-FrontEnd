@@ -10,27 +10,13 @@ import BottomNavBar from '../components/BottomNavBar'
 const HomeScreen = () => {
 
   const navigation = useNavigation();
-    
-  const handleHome = () => {
-      navigation.navigate("home")
-  }
-  const handleSearch = () => {
-    navigation.navigate("search")
-  }
-  const handleLibrary = () => {
-    navigation.navigate("library")
-  }
-  const handleAuthor = () => {
-    navigation.navigate("author")
-  }
-  const handleNotifications = () => {
-    navigation.navigate("notifications")
-  }
+  
   const handleProfilePress =() => {
     navigation.navigate("user-profile")
   }
-  const handleBookClick =() => {
-    navigation.navigate("story-details")
+  const handleBookClick =(novelId) => {
+    
+    navigation.navigate("story-details");
   }
 
   return (
@@ -40,7 +26,7 @@ const HomeScreen = () => {
         <Image source={require("../assets/logo_icon.png")}/>
         <Image source={require("../assets/novelnest-name.png")}/>
         <TouchableOpacity onPress={handleProfilePress}>
-          <Image source={require("../assets/profile-pic.jpg")} style={styles.profilePic}/>
+          <Image source={require("../assets/profile-common.png")} style={styles.profilePic}/>
         </TouchableOpacity>
       </View>
 
@@ -245,7 +231,7 @@ const HomeScreen = () => {
         </View>
       </View>
 
-      <View style={styles.recommandsContainer}>
+      <View style={[styles.recommandsContainer,{marginBottom:50}]}>
         <Text style={styles.headingText}>Since you enjoyed Pencil</Text>
         <View style={styles.list}>
           <View style={styles.listItem}>
@@ -274,9 +260,7 @@ const HomeScreen = () => {
           </View>
         </View>
       </View>
-      <View>
-        <Text></Text>
-      </View>
+
       </ScrollView>
 
       <BottomNavBar/>

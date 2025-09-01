@@ -28,12 +28,12 @@ const EditStoryPublishedScreen = () => {
                     <View style={styles.listItem}>
                       <TouchableOpacity>
                         <Image
-                          source={require('../assets/oursecretlove.jpg')}
+                          source={require('../assets/soul.jpg')}
                           style={styles.bookCover}
                         />
                       </TouchableOpacity>
                       <View style={styles.bookDetails}>
-                        <Text style={styles.subText}>Our Secret Love</Text>
+                        <Text style={styles.subText}>Soul</Text>
                         
                         <View style={styles.statsContainer}>
                           <View style={styles.statsSubContainer}>

@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import BottomNavBar from '../components/BottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 
-const EditMyStoriesScreen = () => {
+const EditMyStoriesScreenDrafts = () => {
   const CATEGORIES = ['All', 'Readings', 'Completed'];
 
   const clickMore = () => {
@@ -40,34 +40,29 @@ const EditMyStoriesScreen = () => {
     setActiveCategory(category.route);
   };
 
+
+  const gotoEditMyStory = () => {
+    navigation.navigate("edit-stories")
+  }
+
   const gotoEditStoryDraft = () => {
     navigation.navigate("edit-story-drafts")
-  }
-
-  const gotoEditStoryPublished = () => {
-    navigation.navigate("edit-story-published")
-  }
-
-  const gotoEditMyStoryDrafts = () => {
-    navigation.navigate("edit-stories-drafts")
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.headingContainer}>
-        <Text style={styles.heading}>Edit my Stories - Published</Text>
+        <Text style={styles.heading}>Edit my Stories - Drafts</Text>
       </View>
 
       <View style={styles.buttonContainer}>
-              
-                <TouchableOpacity style={[styles.button,{backgroundColor:colors.white}]} >
-                <Text style={[styles.buttonText,{color:colors.primary}]}>
-                
+              <TouchableOpacity style={[styles.button,{backgroundColor:colors.secondary}]} onPress={gotoEditMyStory}>
+                <Text style={[styles.buttonText,{color:colors.white}]}>
                   Published
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button,{backgroundColor:colors.secondary}]} onPress={gotoEditMyStoryDrafts}>
-                <Text style={[styles.buttonText,{color:colors.white}]}>
+              <TouchableOpacity style={[styles.button,{backgroundColor:colors.white}]} >
+                <Text style={[styles.buttonText,{color:colors.primary}]}>
                   Drafts
                 </Text>
               </TouchableOpacity>
@@ -77,16 +72,15 @@ const EditMyStoriesScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.list}>
           <View style={styles.listItem}>
-            <TouchableOpacity onPress={gotoEditStoryPublished}>
+            <TouchableOpacity onPress={gotoEditStoryDraft}>
               <Image
-                source={require('../assets/soul.jpg')}
+                source={require('../assets/honestqueen.jpg')}
                 style={styles.bookCover}
               />
             </TouchableOpacity>
             <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Soul</Text>
+              <Text style={styles.subText}>Honest Queen</Text>
               <Text style={styles.authorText}>Drafts - 5</Text>
-              <Text style={styles.authorText}>Published - 10</Text>
               <View style={styles.statsContainer}>
                 <View style={styles.statsSubContainer}>
                   <Icon name="eye" size={15} color={colors.white} />
@@ -102,27 +96,26 @@ const EditMyStoriesScreen = () => {
                 </View>
               </View>
             </View>
-            {/* <TouchableOpacity>
-            <Icon
+            {/* <TouchableOpacity> */}
+            {/* <Icon
               name="ellipsis-v"
               size={20}
               color="white"
               style={styles.moreButton}
-            />
-            </TouchableOpacity> */}
+            /> */}
+            {/* </TouchableOpacity> */}
           </View>
 
           <View style={styles.listItem}>
-            <TouchableOpacity>
+            <TouchableOpacity >
               <Image
-                source={require('../assets/rose.png')}
+                source={require('../assets/mirage.jpg')}
                 style={styles.bookCover}
               />
             </TouchableOpacity>
             <View style={styles.bookDetails}>
-              <Text style={styles.subText}>My name is Rose</Text>
+              <Text style={styles.subText}>Mirage</Text>
               <Text style={styles.authorText}>Drafts - 5</Text>
-              <Text style={styles.authorText}>Published - 10</Text>
               <View style={styles.statsContainer}>
                 <View style={styles.statsSubContainer}>
                   <Icon name="eye" size={15} color={colors.white} />
@@ -138,8 +131,8 @@ const EditMyStoriesScreen = () => {
                 </View>
               </View>
             </View>
-            {/* <TouchableOpacity>
-            <Icon
+            {/* <TouchableOpacity> */}
+            {/* <Icon
           name="ellipsis-v"
               size={20}
               color="white"
@@ -156,7 +149,7 @@ const EditMyStoriesScreen = () => {
   );
 };
 
-export default EditMyStoriesScreen;
+export default EditMyStoriesScreenDrafts;
 
 const styles = StyleSheet.create({
   container: {

@@ -1,8 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { NavigationContainer } from '@react-navigation/native';
 import { colors } from './src/utils/colors';
+
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './src/firebaseConfig'; 
+import { ActivityIndicator } from 'react-native';
 
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -33,6 +37,7 @@ import SearchResultsStoriesScreen from './src/screens/SearchResultsStoriesScreen
 import SearchResultsTagsScreen from './src/screens/SearchResultsTagsScreen';
 import AllMyStoriesScreen from './src/screens/AllMyStoriesScreen';
 import EditMyStoriesScreen from './src/screens/EditMyStoriesScreen';
+import EditMyStoriesScreenDrafts from './src/screens/EditMyStoriesScreenDrafts';
 import CreateStoryScreen from './src/screens/CreateStoryScreen';
 import AddChapterScreen from './src/screens/AddChapterScreen';
 import EditStoryDraftsScreen from './src/screens/EditStoryDraftsScreen';
@@ -42,11 +47,8 @@ import StoryAnalyticsScreen from './src/screens/StoryAnalyticsScreen';
 
 const Stack = createNativeStackNavigator();
 
-const App = () => {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={
+const AuthStack = () => (
+  <Stack.Navigator screenOptions={
         {
           statusBarHidden:true,
           headerStyle:{
@@ -58,9 +60,9 @@ const App = () => {
             color:colors.primary
           }
         }
-        }
-      >
-        <Stack.Screen 
+        }>
+    
+    <Stack.Screen 
           name={"splash"} 
           component={SplashScreen} 
           options={{headerShown:false}}
@@ -70,12 +72,7 @@ const App = () => {
           component={LoginScreen}
           options={{headerShown:false}}
         />
-        <Stack.Screen 
-          name={"home"} 
-          component={HomeScreen}
-          options={{headerShown:false}}
-        />
-        <Stack.Screen 
+    <Stack.Screen 
           name={"signup1"} 
           component={SignupScreen1}
         />
@@ -110,6 +107,34 @@ const App = () => {
           component={ResetConfirmation}
           options={{headerShown:false}}
         />
+  </Stack.Navigator>
+);
+
+const MainStack = () => (
+  
+      <Stack.Navigator
+        screenOptions={
+        {
+          statusBarHidden:true,
+          headerStyle:{
+            backgroundColor:colors.primary
+          },
+          headerTintColor:colors.white,
+          headerShadowVisible:false,
+          headerTitleStyle:{
+            color:colors.primary
+          }
+        }
+        }
+      >
+        
+        <Stack.Screen 
+          name={"home"} 
+          component={HomeScreen}
+          options={{headerShown:false}}
+        />
+        
+        
         <Stack.Screen 
           name={"search"} 
           component={SearchScreen}
@@ -145,6 +170,10 @@ const App = () => {
         <Stack.Screen 
           name={"profile-settings"} 
           component={ProfileSettings}
+        />
+        <Stack.Screen 
+          name={"forgot-password"} 
+          component={ForgotPasswordScreen}
         />
         <Stack.Screen 
           name={"reading-preferences"} 
@@ -189,6 +218,10 @@ const App = () => {
           name={"edit-stories"} 
           component={EditMyStoriesScreen}
         />
+         <Stack.Screen 
+          name={"edit-stories-drafts"} 
+          component={EditMyStoriesScreenDrafts}
+        />
         <Stack.Screen 
           name={"create-stories"} 
           component={CreateStoryScreen}
@@ -214,10 +247,43 @@ const App = () => {
           component={StoryAnalyticsScreen}
         />
       </Stack.Navigator>
-    </NavigationContainer>
   )
-}
 
-export default App
+const RootNavigator = () => {
+  const [user, setUser] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false); 
+  const [loading, setLoading] = useState(true);
+
+ useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (authenticatedUser) => {
+      setUser(authenticatedUser);
+      // Once the first check is done, we are ready to show the app.
+      setIsAuthReady(true); 
+    });
+    return unsubscribe;
+  }, []);
+
+  // Show a Splash/Loading screen until the initial Firebase auth check is complete.
+//   if (!isAuthReady) {
+//     // You can use your custom SplashScreen component here!
+//     return (
+// <Stack.Screen 
+//           name={"splash"} 
+//           component={SplashScreen} 
+//           options={{headerShown:false}}
+//         />
+//     )
+//   }
+
+  return (
+    <NavigationContainer>
+      {user ? <MainStack /> : <AuthStack />}
+    </NavigationContainer>
+  );
+};
+
+
+export default RootNavigator; 
+
 
 const styles = StyleSheet.create({})

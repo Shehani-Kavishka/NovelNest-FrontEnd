@@ -28,7 +28,7 @@ const EditStoryDraftsScreen = () => {
           <View style={styles.imageContainer}>
             <View style={styles.image}>
               <Image
-                source={require('../assets/lovestory.jpg')}
+                source={require('../assets/honestqueen.jpg')}
                 style={styles.bookCover}
               />
             </View>
@@ -38,7 +38,7 @@ const EditStoryDraftsScreen = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.textInput}
-              placeholder="A Pinky Promise"
+              placeholder="Honest Queen"
               placeholderTextColor={colors.primary}
             />
             

@@ -1,13 +1,54 @@
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TextInput, TouchableOpacity, View , Alert, ActivityIndicator} from 'react-native'
 import React, { useState } from 'react'
 import { colors } from '../utils/colors'
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Checkbox } from 'react-native-paper';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebaseConfig';
 
 const CreateStoryScreen = () => {
 
     const navigation = useNavigation();
+
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [tags, setTags] = useState('');
+    const [genre, setGenre] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleCreateStory = async () => {
+        if (!title || !description || !genre) {
+            Alert.alert("Missing Info", "Please fill in the title, description, and genre.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Prepare the tags as an array
+            const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+
+            const createStoryFunc = httpsCallable(functions, 'story-create');
+            const result = await createStoryFunc({
+                title: title,
+                description: description,
+                genre: genre,
+                tags: tagsArray,
+            });
+
+            const { novelId } = result.data;
+            Alert.alert("Success", "Story draft created!");
+
+            // Navigate to the next screen, passing the new novel's ID
+            navigation.navigate("add-chapter", { novelId: novelId });
+
+        } catch (error) {
+            console.error("Failed to create story:", error);
+            Alert.alert("Error", error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
     
     const gotoAddChapter = () => {
         navigation.navigate("add-chapter")
@@ -31,25 +72,32 @@ const CreateStoryScreen = () => {
                 style={styles.textInput}
                 placeholder='Story Title'
                 placeholderTextColor={colors.primary}
+                value={title}
+                onChangeText={setTitle}
               
             />
         </View>
         <Text style={styles.passwordText}>Story Description</Text>
         <View style={styles.inputContainer}>
             <TextInput 
-                style={[styles.textInput,{height:80}]}
+                style={[styles.textInput,{height:80, textAlignVertical:'top'}]}
                 placeholder='Story Description'
                 placeholderTextColor={colors.primary}
+                multiline={true}
+                value={description}
+                onChangeText={setDescription}
                 
             />
         </View>
-       <Text style={styles.passwordText}>Story Tags</Text>
+       <Text style={styles.passwordText}>Story Tags  (comma separated)</Text>
         <View style={styles.inputContainer}>
           
             <TextInput 
                 style={styles.textInput}
-                placeholder='Add some tags to your story'
+                placeholder='e.g. magic, adventure, slowburn'
                 placeholderTextColor={colors.primary}
+                value={tags}
+                onChangeText={setTags}
                
             />
         </View>
@@ -59,6 +107,8 @@ const CreateStoryScreen = () => {
                 style={styles.textInput}
                 placeholder='Story Genre'
                 placeholderTextColor={colors.primary}
+                value={genre}
+                onChangeText={setGenre}
                 
             />
         </View>
@@ -66,9 +116,14 @@ const CreateStoryScreen = () => {
       </View>
 
       <View style={styles.nextButtonContainer}>
-              <TouchableOpacity style={styles.nextButton} onPress={gotoAddChapter}>
-                <Text style={styles.nextText}>Next</Text>
-                <Icon name={'angle-right'} size={25} color={colors.white}/>
+              <TouchableOpacity style={styles.nextButton} onPress={handleCreateStory} disabled={loading}>
+                {loading ? <ActivityIndicator color={colors.white} /> : (
+                        <>
+                            <Text style={styles.nextText}>Next</Text>
+                            <Icon name={'angle-right'} size={25} color={colors.white}/>
+                        </>
+                    )}
+                
               </TouchableOpacity>
               </View>
     </View>

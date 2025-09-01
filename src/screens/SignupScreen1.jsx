@@ -1,19 +1,32 @@
 import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import React from 'react'
+import React, { useState } from 'react'
 import { colors } from '../utils/colors'
 import { useNavigation } from '@react-navigation/native';
 
 const SignupScreen1 = () => {
 
+    // user inputs
+    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
+
     const navigation = useNavigation();
     
         const handleContinue = () => {
-            navigation.navigate("signup2")
+
+            // check fields are filled 
+            if (!email || !username) {
+            Alert.alert("Error", "Please fill in all fields.");
+            return;
+        }
+
+            navigation.navigate("signup2", { email: email.trim(), username: username.trim() });
         }
 
         const handleLogin = () => {
             navigation.navigate("login")
         }
+
+        
 
   return (
     <View style={styles.container}>
@@ -26,6 +39,9 @@ const SignupScreen1 = () => {
                 placeholder='Email'
                 placeholderTextColor={colors.primary}
                 keyboardType='email-address'
+                autoCapitalize='none' 
+                value={email} 
+                onChangeText={setEmail}
             />
         </View>
         <View style={styles.inputContainer}>
@@ -33,6 +49,9 @@ const SignupScreen1 = () => {
                 style={styles.textInput}
                 placeholder='Username'
                 placeholderTextColor={colors.primary}
+                autoCapitalize='words' 
+                value={username} 
+                onChangeText={setUsername} 
             />
         </View>
         <TouchableOpacity 

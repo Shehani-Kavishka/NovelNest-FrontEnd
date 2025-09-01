@@ -1,14 +1,45 @@
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import React, { useState } from 'react'
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native'
+import React, { useEffect, useState } from 'react'
 import { colors } from '../utils/colors'
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+import { httpsCallable } from "firebase/functions";
+import { functions } from '../firebaseConfig';
+
 
 const SignupScreen3 = () => {
 
     const navigation = useNavigation();
-    
-    const handleVerify = () => {
-        navigation.navigate("signup4")
+     const route = useRoute();
+    const { uid } = route.params;
+
+    const [otp, setOtp] = useState('');
+    const [loading, setLoading] = useState(false);
+
+     const handleVerify = async () => {
+        if (otp.length !== 6) {
+            Alert.alert("Invalid Code", "Please enter the 6-digit code from your email.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Call our new verification function
+            const verifyOtpFunc = httpsCallable(functions, 'user-verifyOtp');
+            const result = await verifyOtpFunc({ uid: uid, otp: otp });
+
+            console.log(result.data.message);
+            Alert.alert("Success", "Your email has been verified!");
+
+            // Navigate to the final step
+            navigation.navigate("signup4", { uid: uid, email:route.params.email, password: route.params.password });
+
+        } catch (error) {
+            console.error("OTP Verification failed:", error);
+            Alert.alert("Verification Failed", error.message);
+        } finally {
+            setLoading(false);
+        }
     }
 
 
@@ -29,13 +60,17 @@ const SignupScreen3 = () => {
                 placeholder='Verification Code'
                 placeholderTextColor={colors.primary}
                 keyboardType='number-pad'
+                maxLength={6}
+                value={otp}
+                onChangeText={setOtp}
             />
         </View>
         <TouchableOpacity 
             style={styles.loginButton}
             onPress={handleVerify}
+            disabled={loading}
         >
-            <Text style={styles.loginText}>Verify</Text>
+            {loading ? <ActivityIndicator/> :  <Text style={styles.loginText}>Verify</Text> }
         </TouchableOpacity>
 
       </View>

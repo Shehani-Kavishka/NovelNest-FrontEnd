@@ -1,43 +1,154 @@
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native'
 import React from 'react'
+import { useState, useEffect } from 'react';
 import { colors } from '../utils/colors'
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+import { db } from '../firebaseConfig';
+import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+
+const mockNovelData = {
+    Title: 'My First Love',
+    'Author name': 'Elara Vance',
+    Status: 'Ongoing',
+    'Read count': 12700,
+    'Rating count': 856,
+    Description: 'In a city powered by forgotten magic, a disgraced cartographer discovers a map that leads not to treasure, but to a labyrinth that reshapes itself. She must navigate its shifting walls to uncover a truth that could save her city or shatter it forever.',
+    Tags: ['Romance', 'Young', 'Teenagers'],
+    Genre: 'Romance', // Needed for the similar stories logic
+};
+
+const mockChaptersData = [
+    { id: 'chap1', 'Chapter title': 'The Inked Anomaly', 'Published date': { seconds: 1672531200 } }, // Jan 1, 2023
+    { id: 'chap2', 'Chapter title': 'Whispers in the Walls', 'Published date': { seconds: 1673136000 } }, // Jan 8, 2023
+    { id: 'chap3', 'Chapter title': 'A Compass of Bone', 'Published date': { seconds: 1673740800 } }, // Jan 15, 2023
+    { id: 'chap4', 'Chapter title': 'The Shifting City', 'Published date': { seconds: 1674345600 } }, // Jan 22, 2023
+];
 
 const StoryDetailsScreen = () => {
-
   const navigation = useNavigation();
 
-  const handleRead =() => {
-    navigation.navigate("read")
-  }
+  // const route = useRoute();
+  // const {novelId} = route.params;
+
+   const [novelData, setNovelData] = useState(mockNovelData);
+    const [chapters, setChapters] = useState(mockChaptersData);
+    const [loading, setLoading] = useState(false);
+
+    // useEffect(() => {
+    //     const fetchStoryDetails = async () => {
+    //         if (!novelId) {
+    //             Alert.alert("Error", "No story ID provided.");
+    //             setLoading(false);
+    //             return;
+    //         }
+
+    //         try {
+    //             // 1. Fetch the main novel document
+    //             const novelDocRef = doc(db, 'Novels collection', novelId); // Use the exact collection name
+    //             const novelDocSnap = await getDoc(novelDocRef);
+
+    //             if (novelDocSnap.exists()) {
+    //                 setNovelData(novelDocSnap.data());
+
+    //                 if (fetchedData.Genre) {
+    //             try {
+    //                 const functions = getFunctions();
+    //                 const getSimilar = httpsCallable(functions, 'story-getSimilar');
+    //                 const result = await getSimilar({ genre: fetchedData.Genre, currentNovelId: novelId });
+    //                 setSimilarStories(result.data);
+    //             } catch (error) {
+    //                 console.error("Error fetching similar stories via cloud function:", error);
+    //             }
+    //         }
+
+    //             } else {
+    //                 Alert.alert("Error", "Story not found.");
+    //                 navigation.goBack();
+    //                 return;
+    //             }
+
+    //             // 2. Fetch the chapters from the subcollection
+    //             const chaptersRef = collection(db, 'Novels collection', novelId, 'Chapters subcollection');
+    //             // Query to get published chapters and order them by chapter number
+    //             const chaptersQuery = query(chaptersRef, where("Status", "==", "published"), orderBy("Chapter number", "asc"));
+    //             const querySnapshot = await getDocs(chaptersQuery);
+                
+    //             const chaptersList = querySnapshot.docs.map(doc => ({
+    //                 id: doc.id,
+    //                 ...doc.data()
+    //             }));
+    //             setChapters(chaptersList);
+
+    //         } catch (error) {
+    //             console.error("Error fetching story details:", error);
+    //             Alert.alert("Error", "Could not load story details.");
+    //         } finally {
+    //             setLoading(false);
+    //         }
+    //     };
+
+    //     fetchStoryDetails();
+    // }, [novelId]); // Re-run if novelId ever changes
+
+
+
+const handleRead = () => {
+        
+            navigation.navigate("read");
+    }
+
+    const formatCount = (num) => {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num;
+    };
+
+    if (loading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.white} />
+            </View>
+        );
+    }
+
+    if (!novelData) {
+        // This will show if the data fetch failed after loading
+        return (
+            <View style={[styles.container, { justifyContent: 'center' }]}>
+                <Text style={styles.headingText}>Story could not be loaded.</Text>
+            </View>
+        );
+    }
+
 
   return (
     <View style={styles.container}>
     <ScrollView showsVerticalScrollIndicator={false}>
 
       <View style={styles.bookdetails}>
-      <Image source={require("../assets/myfirstlove.jpg")} style={styles.MainBookCover}/>
-        <Text style={styles.headingText}>My First Love</Text>
-        <Text style={styles.author}>Olivia Wilson</Text>
-        <Text style={styles.Booktype}>Ongoing</Text>
+      <Image source={require("../assets/myfirstlove.jpg")}  style={styles.MainBookCover}/>
+        <Text style={styles.headingText}>{novelData.Title}</Text>
+        <Text style={styles.author}>{novelData['Author name']}</Text>
+        <Text style={styles.Booktype}>{novelData.Status}</Text>
       </View>
 
       <View style={styles.statsContainer}>
 
         <View style={styles.statsSubContainer}>
           <Icon name="eye" size={15} color={colors.white}/>
-          <Text style={styles.textStyle}>155K Reads</Text>
+          <Text style={styles.textStyle}>{formatCount(novelData['Read count'])} Reads</Text>
         </View>
 
         <View style={styles.statsSubContainer}>
           <Icon name="star" size={15} color={colors.white}/>
-          <Text style={styles.textStyle}>4.58K Rates</Text>
+          <Text style={styles.textStyle}>{formatCount(novelData['Rating count'])} Rates</Text>
         </View>
 
         <View style={styles.statsSubContainer}>
           <Icon name="list" size={15} color={colors.white}/>
-          <Text style={styles.textStyle}>14 Parts</Text>
+          <Text style={styles.textStyle}>{chapters.length} Parts</Text>
         </View>
 
       </View>
@@ -57,7 +168,7 @@ const StoryDetailsScreen = () => {
 
       <View style={styles.storyDescription}>
         <Text style={[styles.textStyle,{fontWeight:'regular'}]}>
-          A heartfelt journey of young love, dreams, and self-discovery as two people navigate the highs and lows of their first romance.
+          {novelData.Description}
         </Text>
       </View>
 
@@ -65,62 +176,57 @@ const StoryDetailsScreen = () => {
         <View style={{flexDirection:'row',gap:180}}>
           <View style={{flexDirection:'row',alignItems:'center'}}>
             <Icon name="list" size={15} color={colors.white}/>
-            <Text style={styles.textStyle}>14 Parts</Text>
+            <Text style={styles.textStyle}>{chapters.length} Parts</Text>
           </View>
-          <Text style={styles.Booktype}>Ongoing</Text>
+          <Text style={styles.Booktype}>{novelData.Status}</Text>
         </View>
         <View style={{flexDirection:'row',gap:210,marginTop:20}}>
-          <View>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>Chapter 14</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>Chapter 13</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>Chapter 12</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>Chapter 11</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>Chapter 10</Text>
-          </View>
-          <View>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>date 4</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>date 3</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>date 2</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>date 1</Text>
-            <Text style={[styles.textStyle,{fontWeight:'regular'}]}>date 0</Text>
-          </View>
+          {chapters.slice(0, 5).map(chapter => (
+              <View key={chapter.id} style={{flexDirection:'row', justifyContent:'space-between', marginBottom: 5}}>
+                  <Text style={[styles.textStyle,{fontWeight:'normal'}]}>{chapter['Chapter title']}</Text>
+                  <Text style={[styles.textStyle,{fontWeight:'normal'}]}>{new Date(chapter['Published date'].seconds * 1000).toLocaleDateString()}</Text>
+              </View>
+          ))}
+          {chapters.length > 5 && <Text style={styles.textStyle}>... and more</Text>}
+
         </View>
       </View>
 
       <View style={styles.tagList}>
-        <Text style={styles.tagItem}>Romance</Text>
-        <Text style={styles.tagItem}>Youth</Text>
-        <Text style={styles.tagItem}>Drama</Text>
+        {novelData.Tags.map((tag, index) => (
+            <Text key={index} style={styles.tagItem}>{tag}</Text>
+        ))}
+
       </View>
 
       <View style={styles.recommandsContainer}>
               <Text style={styles.headingText}>Similar Stories</Text>
               <View style={styles.list}>
-                <View style={styles.listItem}>
-                  <TouchableOpacity>
-                    <Image source={require("../assets/oursecretlove.jpg")} style={styles.bookCover}/>
-                  </TouchableOpacity>
-                  <Text style={styles.bookTitle}>Our Secret Love</Text>
-                </View>
-                <View style={styles.listItem}>
-                  <TouchableOpacity>
-                    <Image source={require("../assets/love.jpg")} style={styles.bookCover}/>
-                  </TouchableOpacity>
-                  <Text style={styles.bookTitle}>Love</Text>
-                </View>
-                <View style={styles.listItem}>
-                  <TouchableOpacity>
-                    <Image source={require("../assets/waitingforyou.jpg")} style={styles.bookCover}/>
-                  </TouchableOpacity>
-                  <Text style={styles.bookTitle}>Waiting For You</Text>
-                </View>
-                <View style={styles.listItem}>
-                  <TouchableOpacity>
-                    <Image source={require("../assets/fightingfor.jpg")} style={styles.bookCover}/>
-                  </TouchableOpacity>
-                  <Text style={styles.bookTitle}>Fighting For</Text>
-                </View>
-              </View>
+                        <View style={styles.listItem}>
+                          <TouchableOpacity>
+                            <Image source={require("../assets/oursecretlove.jpg")} style={styles.bookCover}/>
+                          </TouchableOpacity>
+                          <Text style={styles.bookTitle}>Our Secret Love</Text>
+                        </View>
+                        <View style={styles.listItem}>
+                          <TouchableOpacity>
+                            <Image source={require("../assets/love.jpg")} style={styles.bookCover}/>
+                          </TouchableOpacity>
+                          <Text style={styles.bookTitle}>Love</Text>
+                        </View>
+                        <View style={styles.listItem}>
+                          <TouchableOpacity>
+                            <Image source={require("../assets/waitingforyou.jpg")} style={styles.bookCover}/>
+                          </TouchableOpacity>
+                          <Text style={styles.bookTitle}>Waiting For You</Text>
+                        </View>
+                        <View style={styles.listItem}>
+                          <TouchableOpacity>
+                            <Image source={require("../assets/fightingfor.jpg")} style={styles.bookCover}/>
+                          </TouchableOpacity>
+                          <Text style={styles.bookTitle}>Fighting For</Text>
+                        </View>
+                      </View>
             </View>
     </ScrollView>          
     </View>
