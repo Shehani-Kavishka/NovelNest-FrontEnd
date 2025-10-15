@@ -7,25 +7,96 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProgressBar } from 'react-native-paper';
 import { colors } from '../utils/colors';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import BottomNavBar from '../components/BottomNavBar';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation , useIsFocused} from '@react-navigation/native';
+
+import { auth, db } from '../firebaseConfig';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const LibraryScreen = () => {
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
+  
   const CATEGORIES = ['All', 'Readings', 'Completed'];
 
-  const renderCategory = ({ item }) => {
-    return (
-      <TouchableOpacity>
-        <Text style={[styles.tagItem]}>{item}</Text>
-      </TouchableOpacity>
-    );
-  };
+  const [libraryItems, setLibraryItems] = useState([]);
+    const [filteredItems, setFilteredItems] = useState([]);
+    const [activeCategory, setActiveCategory] = useState('All');
+    const [loading, setLoading] = useState(true);
 
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+
+        const libraryRef = collection(db, 'users', user.uid, 'library');
+        const q = query(libraryRef, orderBy('addedAt', 'desc'));
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const items = querySnapshot.docs.map(doc => ({
+                storyId: doc.id,
+                ...doc.data()
+            }));
+            setLibraryItems(items);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching library:", error);
+            Alert.alert("Error", "Could not load your library.");
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [isFocused]);
+
+     useEffect(() => {
+        if (activeCategory === 'All') {
+            setFilteredItems(libraryItems);
+        } else {
+            const filtered = libraryItems.filter(item => item.readingStatus === activeCategory);
+            setFilteredItems(filtered);
+        }
+    }, [activeCategory, libraryItems]);
+
+     const handleRemoveFromLibrary = (storyId, storyTitle) => {
+        Alert.alert(
+            "Remove Story",
+            `Are you sure you want to remove "${storyTitle}" from your library?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Remove",
+                    style: "destructive",
+                    onPress: async () => {
+                        const user = auth.currentUser;
+                        if (user) {
+                            await deleteDoc(doc(db, 'users', user.uid, 'library', storyId));
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+
+const renderCategory = ({ item }) => (
+        <TouchableOpacity onPress={() => setActiveCategory(item)}>
+            <Text style={[styles.tagItem, activeCategory === item && styles.activeTag]}>{item}</Text>
+        </TouchableOpacity>
+    );
+
+if (loading) {
+        return <View style={styles.container}><ActivityIndicator size="large" color={colors.white} /></View>
+    }
+    
   const clickMore = () => {
     return(
       <View style={styles.moreContainer}>
@@ -38,15 +109,6 @@ const LibraryScreen = () => {
       </View>
     )
   }
-
-  const navigation = useNavigation();
-  const [activeCategory, setActiveCategory] = useState();
-
-  const handleCategoryPress = category => {
-    navigation.navigate(category.route);
-
-    setActiveCategory(category.route);
-  };
 
   return (
     <View style={styles.container}>
@@ -65,141 +127,31 @@ const LibraryScreen = () => {
         </View>
 
         <View style={styles.countContainer}>
-          <Text style={styles.fieldText}>All Saved Reads</Text>
-          <Text style={styles.fieldText}>6 Stories</Text>
-        </View>
-
-        <View style={styles.list}>
-          <View style={styles.listItem}>
-            <TouchableOpacity>
-              <Image
-                source={require('../assets/pencil.jpeg')}
-                style={styles.bookCover}
-              />
-            </TouchableOpacity>
-            <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Pencil</Text>
-              <Text style={styles.authorText}>Liversack</Text>
-              <ProgressBar
-                progress={1.0}
-                style={styles.progress}
-                color={colors.secondary}
-              />
-              <Text style={styles.partsText}>0 parts left</Text>
+                <Text style={styles.fieldText}>{activeCategory} Stories</Text>
+                <Text style={styles.fieldText}>{filteredItems.length} Stories</Text>
             </View>
-            <Icon name="ellipsis-v" size={20} color="white" style={styles.moreButton} />
-          </View>
-        
 
-        
-          <View style={styles.listItem}>
-            <TouchableOpacity>
-              <Image
-                source={require('../assets/soul.jpg')}
-                style={styles.bookCover}
-              />
-            </TouchableOpacity>
-            <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Soul</Text>
-              <Text style={styles.authorText}>Henry Paul</Text>
-              <ProgressBar
-                progress={1.0}
-                style={styles.progress}
-                color={colors.secondary}
-              />
-              <Text style={styles.partsText}>0 parts left</Text>
-            </View>
-            <Icon name="ellipsis-v" size={20} color="white" style={styles.moreButton} />
-          </View>
-       
-
-        
-          <View style={styles.listItem}>
-            <TouchableOpacity>
-              <Image
-                source={require('../assets/starlight.jpg')}
-                style={styles.bookCover}
-              />
-            </TouchableOpacity>
-            <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Star Light</Text>
-              <Text style={styles.authorText}>Issac Mattew</Text>
-              <ProgressBar
-                progress={1.0}
-                style={styles.progress}
-                color={colors.secondary}
-              />
-              <Text style={styles.partsText}>0 parts left</Text>
-            </View>
-            <Icon name="ellipsis-v" size={20} color="white" style={styles.moreButton} />
-          </View>
-        
-
-       
-          <View style={styles.listItem}>
-            <TouchableOpacity>
-              <Image
-                source={require('../assets/moths.jpg')}
-                style={styles.bookCover}
-              />
-            </TouchableOpacity>
-            <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Moths</Text>
-              <Text style={styles.authorText}>Liversack</Text>
-              <ProgressBar
-                progress={1.0}
-                style={styles.progress}
-                color={colors.secondary}
-              />
-              <Text style={styles.partsText}>0 parts left</Text>
-            </View>
-            <Icon name="ellipsis-v" size={20} color="white" style={styles.moreButton} />
-          </View>
-       
-
-       
-          <View style={styles.listItem}>
-            <TouchableOpacity>
-              <Image
-                source={require('../assets/thread.jpg')}
-                style={styles.bookCover}
-              />
-            </TouchableOpacity>
-            <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Thread</Text>
-              <Text style={styles.authorText}>John Winsly</Text>
-              <ProgressBar
-                progress={1.0}
-                style={styles.progress}
-                color={colors.secondary}
-              />
-              <Text style={styles.partsText}>0 parts left</Text>
-            </View>
-            <Icon name="ellipsis-v" size={20} color="white" style={styles.moreButton} />
-          </View>
-       
-
-     
-          <View style={styles.listItem}>
-            <TouchableOpacity>
-              <Image
-                source={require('../assets/staywithme.jpg')}
-                style={styles.bookCover}
-              />
-            </TouchableOpacity>
-            <View style={styles.bookDetails}>
-              <Text style={styles.subText}>Stay With Me</Text>
-              <Text style={styles.authorText}>Ladybird</Text>
-              <ProgressBar
-                progress={1.0}
-                style={styles.progress}
-                color={colors.secondary}
-              />
-              <Text style={styles.partsText}>0 parts left</Text>
-            </View>
-            <Icon name="ellipsis-v" size={20} color="white" style={styles.moreButton} />
-          </View>
-        </View>
+     <FlatList
+                data={filteredItems}
+                keyExtractor={(item) => item.storyId}
+                contentContainerStyle={styles.list}
+                renderItem={({ item }) => (
+                    <View style={styles.listItem}>
+                        <TouchableOpacity onPress={() => navigation.navigate('story-details', { storyId: item.storyId })}>
+                            <Image source={{ uri: item.storyCoverImageUrl }} style={styles.bookCover} />
+                        </TouchableOpacity>
+                        <View style={styles.bookDetails}>
+                            <Text style={styles.subText}>{item.storyTitle}</Text>
+                            <Text style={styles.authorText}>{item.author}</Text>
+                            {/* Note: Progress calculation is complex and would require more data */}
+                        </View>
+                        <TouchableOpacity onPress={() => handleRemoveFromLibrary(item.storyId, item.storyTitle)}>
+                            <Icon name="trash" size={20} color="white" />
+                        </TouchableOpacity>
+                    </View>
+                )}
+                ListEmptyComponent={<Text style={styles.emptyText}>No stories in this category.</Text>}
+            />
 
       </ScrollView>
 

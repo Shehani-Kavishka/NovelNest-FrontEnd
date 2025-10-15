@@ -8,14 +8,16 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors } from '../utils/colors';
 import { Icon } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 
 import { launchImageLibrary } from 'react-native-image-picker';
 
-import { getAuth, deleteUser } from 'firebase/auth';
+import { getAuth,updateProfile, deleteUser } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const UserProfileData = {
@@ -27,11 +29,82 @@ const UserProfileData = {
 };
 
 const ProfileSettings = () => {
-  const [userData, setUserData] = useState(UserProfileData);
-  const [profileImage, setProfileImage] = useState(null);
-  const [loading, setLoading] = useState(false);
+const navigation = useNavigation();
 
-  const navigation = useNavigation();
+const [displayName, setDisplayName] = useState('');
+  const [profileImage, setProfileImage] = useState(null);
+  const [newImageUri, setNewImageUri] = useState(null);
+
+   const [isLoading, setIsLoading] = useState(true); 
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+      const fetchUserData = async () => {
+        const user = getAuth().currentUser;
+        if (user) {
+          setDisplayName(user.displayName || '');
+          setProfileImage(user.photoURL || null);
+        }
+        setIsLoading(false);
+      };
+      fetchUserData();
+    }, []);
+
+
+    const handleChoosePhoto = async () => {
+      await launchImageLibrary({ mediaType: 'photo', quality: 1 }, (response) => {
+if(response.assets && response.assets.length > 0) {
+  const selectedUri = response.assets[0].uri;
+  setProfileImage(selectedUri);
+  setNewImageUri(selectedUri); 
+}
+      });
+    };
+
+    const handleSaveChanges = async () => {
+      if (isSaving) return;
+      setIsSaving(true);
+
+      const user = getAuth().currentUser;
+      if (!user) {
+        Alert.alert('Error', 'No user is logged in.');
+        setIsSaving(false);
+        return;
+      } 
+
+      try {
+        let photoURL = user.photoURL;
+        if (newImageUri) {
+          const strorage = getStorage();
+          const imageRef = ref(strorage, `profile-pictures/${user.uid}`);
+          const response = await fetch(newImageUri);
+          const blob = await response.blob();
+          await uploadBytes(imageRef, blob);
+          photoURL = await getDownloadURL(imageRef);
+        }
+
+        await updateProfile(user, {
+          displayName: displayName,
+          photoURL: photoURL,
+        });
+        const db = getFirestore();
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, {
+          username: displayName,
+          profilePicUrl: photoURL,
+        });
+
+        Alert.alert('Success', 'Profile updated successfully.');
+        navigation.goBack();
+      }catch(error){
+        console.error('Failed to update profile:', error);
+        Alert.alert('Error', 'Could not update profile. Please try again.');
+      }
+      finally{
+        setIsSaving(false);
+      }
+    };
+  
   const gotoForgotPassword = () => {
     navigation.navigate('forgot-password');
   };
@@ -40,28 +113,8 @@ const ProfileSettings = () => {
     navigation.navigate('change-password');
   };
 
-  const handleChoosePhoto = async () => {
-    const options = {
-      mediaType: 'photo',
-      quality: 1,
-    };
-
-    await launchImageLibrary(options, response => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorCode) {
-        console.log('ImagePicker Error: ', response.errorMessage);
-        Alert.alert('Error', 'Could not select image. Please try again.');
-      } else if (response.assets && response.assets.length > 0) {
-        // We have a URI!
-        const selectedUri = response.assets[0].uri;
-        setProfileImage(selectedUri);
-      }
-    });
-  };
-
   const handleDeleteAccount = async () => {
-    // STEP 3: Show a confirmation alert first
+    
     Alert.alert(
       'Delete Account',
       'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
@@ -73,7 +126,7 @@ const ProfileSettings = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          // This function will run if the user presses "Delete"
+          
           onPress: async () => {
             setLoading(true);
             const auth = getAuth();
@@ -86,29 +139,27 @@ const ProfileSettings = () => {
             }
 
             try {
-              // STEP 4: Call the Cloud Function to move Firestore data
+              
               const functions = getFunctions();
-              // The name 'user-deleteAccount' comes from your index.js export
+             
               const deleteUserData = httpsCallable(
                 functions,
                 'user-deleteAccount',
               );
               await deleteUserData();
 
-              // STEP 5: If the function succeeds, delete the user from Firebase Auth
+             
               await deleteUser(user);
 
-              // STEP 6: Show success message. The app will auto-navigate.
+            
               Alert.alert(
                 'Account Deleted',
                 'Your account has been successfully deleted.',
               );
-              // NOTE: You don't need to navigate manually. The `onAuthStateChanged`
-              // listener in your App.jsx will detect the user is null and automatically
-              // switch to the AuthStack, effectively taking you to the splash/login screen.
+            
             } catch (error) {
               console.error('Failed to delete account:', error);
-              // This is a common security error. The user must have logged in recently.
+       
               if (error.code === 'auth/requires-recent-login') {
                 Alert.alert(
                   'Action Required',
@@ -128,6 +179,14 @@ const ProfileSettings = () => {
       ],
     );
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={colors.white} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -152,13 +211,11 @@ const ProfileSettings = () => {
         <Text style={styles.fieldText}>Username</Text>
         <View style={styles.inputContainer}>
           <TextInput
-            value={userData.displayName || userData.username || ''}
+            value={displayName}
             style={styles.textInput}
             placeholder="Enter user name"
             placeholderTextColor={colors.primary}
-            onChangeText={newUsername =>
-              setUserData({ ...userData, displayName: newUsername })
-            }
+            onChangeText={setDisplayName}
           />
         </View>
         <Text style={styles.fieldText}>Email</Text>
@@ -167,15 +224,21 @@ const ProfileSettings = () => {
             style={styles.textInput}
             placeholderTextColor={colors.primary}
             keyboardType="email-address"
-            value={userData.email}
+            value={getAuth().currentUser?.email}
             editable={false}
-            onChangeText={newEmail =>
-              setUserData({ ...userData, email: newEmail })
-            }
             placeholder="Enter email address"
           />
         </View>
       </View>
+
+<TouchableOpacity style={styles.fieldText} onPress={handleSaveChanges} disabled={isSaving}>
+        {isSaving ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        )}
+      </TouchableOpacity>
+
       <View style={styles.optionslist}>
         <TouchableOpacity onPress={gotoChangePassword}>
           <Text style={[styles.fieldText, { marginBottom: 50 }]}>

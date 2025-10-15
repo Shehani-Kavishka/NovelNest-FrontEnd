@@ -11,7 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { colors } from '../utils/colors';
 import BookEditBar from '../components/BookEditBar';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -28,7 +28,7 @@ const AddChapterScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
 
-  const { novelId } = route.params;
+  const { storyId, chapterId, initialTitle, initialContent} = route.params;
 
   const richText = useRef();
 
@@ -36,6 +36,17 @@ const AddChapterScreen = () => {
   const [contentHTML, setContentHTML] = useState('');
   const [loading, setLoading] = useState(false);
   const [isMenuVisible, setMenuVisible] = useState(false);
+
+   useEffect(() => {
+    if (chapterId) {
+        setTitle(initialTitle || '');
+        setContentHTML(initialContent || '');
+        // This makes the RichEditor display the initial content
+        if (richText.current) {
+            richText.current.setContentHTML(initialContent || '');
+        }
+    }
+  }, [chapterId, initialTitle, initialContent]);
 
   const handleSave = async status => {
     if (!title || !contentHTML) {
@@ -51,9 +62,9 @@ const AddChapterScreen = () => {
     try {
       const addChapterFunc = httpsCallable(functions, 'story-addChapter');
       const result = await addChapterFunc({
-        novelId: novelId,
-        title: title,
-        content: contentHTML,
+        storyId: storyId,
+        chapterTitle: title,
+        chapterContent: contentHTML,
         status: status,
       });
 
@@ -68,18 +79,57 @@ const AddChapterScreen = () => {
     }
   };
 
-  const handleDeleteChapter = () => {
-    // Logic for deleting a chapter would go here.
-    // This would involve another Cloud Function.
-    Alert.alert('Delete', 'Delete functionality to be implemented.');
-    setMenuVisible(false);
+const handleDeleteChapter = () => {
+    setMenuVisible(false); // Close the menu first
+
+    // A chapter can only be deleted if it exists (i.e., we are editing it)
+    if (!chapterId) {
+        Alert.alert("Cannot Delete", "This chapter has not been saved yet.");
+        return;
+    }
+
+    // Add a confirmation dialog for safety
+    Alert.alert(
+        "Delete Chapter",
+        "Are you sure you want to permanently delete this chapter?",
+        [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                    setLoading(true);
+                    try {
+                        const deleteChapterFunc = httpsCallable(functions, 'story-deleteChapter');
+                        await deleteChapterFunc({ storyId, chapterId });
+                        
+                        Alert.alert("Success", "Chapter has been deleted.");
+                        navigation.goBack(); // Go back to the previous screen
+
+                    } catch (error) {
+                        console.error("Failed to delete chapter:", error);
+                        Alert.alert("Error", error.message || "Could not delete chapter.");
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+            }
+        ]
+    );
   };
 
-  const handlePreviewChapter = () => {
-    // Logic for previewing would go here.
-    // This might navigate to a new screen passing the title and contentHTML.
-    Alert.alert('Preview', 'Preview functionality to be implemented.');
+const handlePreviewChapter = () => {
+    if (!title && !contentHTML) {
+        Alert.alert("Nothing to Preview", "Please add a title or some content first.");
+        return;
+    }
     setMenuVisible(false);
+    // Navigate to a new 'PreviewScreen' (you'll need to create this screen)
+    // It will be similar to the ReadScreen but with temporary data.
+    navigation.navigate('PreviewScreen', {
+        chapterTitle: title,
+        chapterContent: contentHTML,
+    });
   };
 
   return (
@@ -88,7 +138,7 @@ const AddChapterScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.headingContainer}>
-        <Text style={styles.titleText}>New Chapter</Text>
+        <Text style={styles.titleText}>{chapterId ? 'Edit Chapter' : 'New Chapter'}</Text>
         {loading ? (
           <ActivityIndicator color={colors.white} style={{ marginRight: 20 }} />
         ) : (
@@ -142,59 +192,97 @@ const AddChapterScreen = () => {
       </ScrollView>
 
       <View style={styles.bottomBar}>
-
-      <RichToolbar
-        editor={richText} // Connect the toolbar to the editor
-        actions={[
-          actions.setBold,
-          actions.setItalic,
-          actions.setUnderline,
-          actions.alignLeft,
-          actions.alignCenter,
-          actions.alignRight,
-        ]}
-        iconMap={{
-          // Optional: Use FontAwesome icons
-          [actions.setBold]: ({ tintColor }) => (
-            <View style={styles.toolbarButton}>
-            <Icon name="bold" size={25} color={colors.white} marginHorizontal={25} width={25}  />
-            </View>
-          ),
-          [actions.setItalic]: ({ tintColor }) => (
-             <View style={styles.toolbarButton}>
-            <Icon name="italic" size={25} color={colors.white} marginHorizontal={50} width={25} />
-            </View>
-          ),
-          [actions.setUnderline]: ({ tintColor }) => (
-            <View style={styles.toolbarButton}>
-            <Icon name="underline" size={25} color={colors.white} marginHorizontal={70} width={25} />
-            </View>
-          ),
-          [actions.alignLeft]: ({ tintColor }) => (
-            <View style={styles.toolbarButton}>
-            <Icon name="align-left" size={25} color={colors.white} marginHorizontal={90} width={25} />
-            </View>
-          ),
-          [actions.alignCenter]: ({ tintColor }) => (
-            <View style={styles.toolbarButton}>
-            <Icon name="align-center" size={25} color={colors.white}  marginHorizontal={110} width={25}/>
-            </View>
-          ),
-          [actions.alignRight]: ({ tintColor }) => (
-            <View style={styles.toolbarButton}>
-            <Icon name="align-right" size={25} color={colors.white}  marginHorizontal={135} width={25} />
-            </View>
-          ),
-          // Add other icons as needed
-        }}
-        style={styles.richToolbar}
-         selectedIconTint={colors.primary}
-        iconTint={colors.white}
-      />
-      <TouchableOpacity style={styles.moreButton} onPress={() => setMenuVisible(true)}>
-        <Icon name="ellipsis-v" size={25} color="white" />
-      </TouchableOpacity>
-</View>
+        <RichToolbar
+          editor={richText} // Connect the toolbar to the editor
+          actions={[
+            actions.setBold,
+            actions.setItalic,
+            actions.setUnderline,
+            actions.alignLeft,
+            actions.alignCenter,
+            actions.alignRight,
+          ]}
+          iconMap={{
+            // Optional: Use FontAwesome icons
+            [actions.setBold]: ({ tintColor }) => (
+              <View style={styles.toolbarButton}>
+                <Icon
+                  name="bold"
+                  size={25}
+                  color={colors.white}
+                  marginHorizontal={25}
+                  width={25}
+                />
+              </View>
+            ),
+            [actions.setItalic]: ({ tintColor }) => (
+              <View style={styles.toolbarButton}>
+                <Icon
+                  name="italic"
+                  size={25}
+                  color={colors.white}
+                  marginHorizontal={50}
+                  width={25}
+                />
+              </View>
+            ),
+            [actions.setUnderline]: ({ tintColor }) => (
+              <View style={styles.toolbarButton}>
+                <Icon
+                  name="underline"
+                  size={25}
+                  color={colors.white}
+                  marginHorizontal={70}
+                  width={25}
+                />
+              </View>
+            ),
+            [actions.alignLeft]: ({ tintColor }) => (
+              <View style={styles.toolbarButton}>
+                <Icon
+                  name="align-left"
+                  size={25}
+                  color={colors.white}
+                  marginHorizontal={90}
+                  width={25}
+                />
+              </View>
+            ),
+            [actions.alignCenter]: ({ tintColor }) => (
+              <View style={styles.toolbarButton}>
+                <Icon
+                  name="align-center"
+                  size={25}
+                  color={colors.white}
+                  marginHorizontal={110}
+                  width={25}
+                />
+              </View>
+            ),
+            [actions.alignRight]: ({ tintColor }) => (
+              <View style={styles.toolbarButton}>
+                <Icon
+                  name="align-right"
+                  size={25}
+                  color={colors.white}
+                  marginHorizontal={135}
+                  width={25}
+                />
+              </View>
+            ),
+            // Add other icons as needed
+          }}
+          style={styles.richToolbar}
+          selectedIconTint={colors.primary}
+          iconTint={colors.white}
+        />
+        <TouchableOpacity
+          style={styles.moreButton}
+          onPress={() => setMenuVisible(true)}
+        >
+          <Icon name="ellipsis-v" size={25} color="white" />
+        </TouchableOpacity>
+      </View>
       <Modal
         animationType="fade"
         transparent={true}
@@ -203,21 +291,35 @@ const AddChapterScreen = () => {
           setMenuVisible(false); // Allows closing with the Android back button
         }}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setMenuVisible(false)}>
-            <View style={styles.modalContent}>
-                <TouchableOpacity style={styles.modalButton} onPress={() => handleSave('draft')}>
-                    <Text style={styles.modalButtonText}>Save Chapter in Drafts</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalButton} onPress={handlePreviewChapter}>
-                    <Text style={styles.modalButtonText}>Preview Chapter</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalButton} onPress={handleDeleteChapter}>
-                    <Text style={[styles.modalButtonText, styles.deleteText]}>Delete Chapter</Text>
-                </TouchableOpacity>
-            </View>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setMenuVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => handleSave('draft')}
+            >
+              <Text style={styles.modalButtonText}>Save Chapter in Drafts</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handlePreviewChapter}
+            >
+              <Text style={styles.modalButtonText}>Preview Chapter</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleDeleteChapter}
+            >
+              <Text style={[styles.modalButtonText, styles.deleteText]}>
+                Delete Chapter
+              </Text>
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
-      
     </KeyboardAvoidingView>
   );
 };
@@ -267,9 +369,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
   },
-richEditor: {
+  richEditor: {
     flex: 1,
-    marginHorizontal: 10
+    marginHorizontal: 10,
   },
   richToolbar: {
     backgroundColor: colors.secondary,
@@ -277,11 +379,11 @@ richEditor: {
     // justifyContent:'center',
     // alignItems:'center',
     height: 50,
-    width:375,
-    alignSelf:'flex-start'
+    width: 375,
+    alignSelf: 'flex-start',
   },
-  toolbarButton:{
-    width:30,
+  toolbarButton: {
+    width: 30,
   },
   moreButton: {
     position: 'absolute',
@@ -314,14 +416,13 @@ richEditor: {
     color: colors.white,
     fontSize: 18,
     textAlign: 'center',
-    fontWeight:'bold'
+    fontWeight: 'bold',
   },
   deleteText: {
     color: colors.red, // A reddish color for delete
     fontWeight: 'bold',
   },
-  bottomBar:{
-    backgroundColor:colors.secondary
-  }
-
+  bottomBar: {
+    backgroundColor: colors.secondary,
+  },
 });

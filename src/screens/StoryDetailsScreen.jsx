@@ -5,99 +5,120 @@ import { colors } from '../utils/colors'
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import { db } from '../firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db, auth } from '../firebaseConfig';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
-const mockNovelData = {
-    Title: 'My First Love',
-    'Author name': 'Elara Vance',
-    Status: 'Ongoing',
-    'Read count': 12700,
-    'Rating count': 856,
-    Description: 'In a city powered by forgotten magic, a disgraced cartographer discovers a map that leads not to treasure, but to a labyrinth that reshapes itself. She must navigate its shifting walls to uncover a truth that could save her city or shatter it forever.',
-    Tags: ['Romance', 'Young', 'Teenagers'],
-    Genre: 'Romance', // Needed for the similar stories logic
-};
+// const mockNovelData = {
+//     Title: 'My First Love',
+//     'Author name': 'Elara Vance',
+//     Status: 'Ongoing',
+//     'Read count': 12700,
+//     'Rating count': 856,
+//     Description: 'In a city powered by forgotten magic, a disgraced cartographer discovers a map that leads not to treasure, but to a labyrinth that reshapes itself. She must navigate its shifting walls to uncover a truth that could save her city or shatter it forever.',
+//     Tags: ['Romance', 'Young', 'Teenagers'],
+//     Genre: 'Romance', // Needed for the similar stories logic
+// };
 
-const mockChaptersData = [
-    { id: 'chap1', 'Chapter title': 'The Inked Anomaly', 'Published date': { seconds: 1672531200 } }, // Jan 1, 2023
-    { id: 'chap2', 'Chapter title': 'Whispers in the Walls', 'Published date': { seconds: 1673136000 } }, // Jan 8, 2023
-    { id: 'chap3', 'Chapter title': 'A Compass of Bone', 'Published date': { seconds: 1673740800 } }, // Jan 15, 2023
-    { id: 'chap4', 'Chapter title': 'The Shifting City', 'Published date': { seconds: 1674345600 } }, // Jan 22, 2023
-];
+// const mockChaptersData = [
+//     { id: 'chap1', 'Chapter title': 'The Inked Anomaly', 'Published date': { seconds: 1672531200 } }, // Jan 1, 2023
+//     { id: 'chap2', 'Chapter title': 'Whispers in the Walls', 'Published date': { seconds: 1673136000 } }, // Jan 8, 2023
+//     { id: 'chap3', 'Chapter title': 'A Compass of Bone', 'Published date': { seconds: 1673740800 } }, // Jan 15, 2023
+//     { id: 'chap4', 'Chapter title': 'The Shifting City', 'Published date': { seconds: 1674345600 } }, // Jan 22, 2023
+// ];
 
 const StoryDetailsScreen = () => {
   const navigation = useNavigation();
 
-  // const route = useRoute();
-  // const {novelId} = route.params;
+  const route = useRoute();
+  const {storyId} = route.params;
 
-   const [novelData, setNovelData] = useState(mockNovelData);
-    const [chapters, setChapters] = useState(mockChaptersData);
+   const [storyData, setStoryData] = useState(null);
+    const [chapters, setChapters] = useState([]);
+    const [isInLibrary, setIsInLibrary] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // useEffect(() => {
-    //     const fetchStoryDetails = async () => {
-    //         if (!novelId) {
-    //             Alert.alert("Error", "No story ID provided.");
-    //             setLoading(false);
-    //             return;
-    //         }
+    useEffect(() => {
+        const fetchAllData = async () => {
+            if (!storyId) {
+                Alert.alert("Error", "No story ID provided.");
+                setLoading(false);
+                return;
+            }
+            const user = auth.currentUser;
 
-    //         try {
-    //             // 1. Fetch the main novel document
-    //             const novelDocRef = doc(db, 'Novels collection', novelId); // Use the exact collection name
-    //             const novelDocSnap = await getDoc(novelDocRef);
+            try {
+                // 1. Fetch the main story document
+                const storyDocRef = doc(db, 'stories', storyId); // Use the exact collection name
+                const storyDocSnap = await getDoc(storyDocRef);
 
-    //             if (novelDocSnap.exists()) {
-    //                 setNovelData(novelDocSnap.data());
+                if (storyDocSnap.exists()) {
+                    setStoryData(storyDocSnap.data());
+                }else{
+                  Alert.alert("Error", "Story not found.");
+                  navigation.goBack();
+                  return;
+                }
 
-    //                 if (fetchedData.Genre) {
-    //             try {
-    //                 const functions = getFunctions();
-    //                 const getSimilar = httpsCallable(functions, 'story-getSimilar');
-    //                 const result = await getSimilar({ genre: fetchedData.Genre, currentNovelId: novelId });
-    //                 setSimilarStories(result.data);
-    //             } catch (error) {
-    //                 console.error("Error fetching similar stories via cloud function:", error);
-    //             }
-    //         }
+                 const chaptersRef = collection(db, 'stories', storyId, 'chapters');
+                const q = query(chaptersRef, where("chapterStatus", "==", "published"), orderBy("chapterNo", "asc"));
+                const querySnapshot = await getDocs(q);
+                const chaptersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setChapters(chaptersList);
 
-    //             } else {
-    //                 Alert.alert("Error", "Story not found.");
-    //                 navigation.goBack();
-    //                 return;
-    //             }
+                if (user) {
+                    const libraryDocRef = doc(db, 'users', user.uid, 'library', storyId);
+                    const libraryDocSnap = await getDoc(libraryDocRef);
+                    setIsInLibrary(libraryDocSnap.exists());
+                }
 
-    //             // 2. Fetch the chapters from the subcollection
-    //             const chaptersRef = collection(db, 'Novels collection', novelId, 'Chapters subcollection');
-    //             // Query to get published chapters and order them by chapter number
-    //             const chaptersQuery = query(chaptersRef, where("Status", "==", "published"), orderBy("Chapter number", "asc"));
-    //             const querySnapshot = await getDocs(chaptersQuery);
-                
-    //             const chaptersList = querySnapshot.docs.map(doc => ({
-    //                 id: doc.id,
-    //                 ...doc.data()
-    //             }));
-    //             setChapters(chaptersList);
+                } catch (error) {
+                console.error("Error fetching story details:", error);
+                Alert.alert("Error", "Could not load story details.");
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    //         } catch (error) {
-    //             console.error("Error fetching story details:", error);
-    //             Alert.alert("Error", "Could not load story details.");
-    //         } finally {
-    //             setLoading(false);
-    //         }
-    //     };
+        fetchAllData();
+    }, [storyId]); // Re-run if the storyId changes
 
-    //     fetchStoryDetails();
-    // }, [novelId]); // Re-run if novelId ever changes
+                    
+ const handleToggleLibrary = async () => {
+        const user = auth.currentUser;
+        if (!user) {
+            Alert.alert("Login Required", "Please log in to add stories to your library.");
+            return;
+        }
 
+        const libraryDocRef = doc(db, 'users', user.uid, 'library', storyId);
+
+        if (isInLibrary) {
+            // Remove from library
+            await deleteDoc(libraryDocRef);
+            setIsInLibrary(false);
+            Alert.alert("Removed", `${storyData.storyTitle} has been removed from your library.`);
+        } else {
+            // Add to library
+            await setDoc(libraryDocRef, {
+                addedAt: serverTimestamp(),
+                storyTitle: storyData.storyTitle,
+                storyCoverImageUrl: storyData.storyCoverImageUrl,
+                author: storyData.author,
+                readingStatus: 'to read' // Initial status
+            });
+            setIsInLibrary(true);
+            Alert.alert("Added", `${storyData.storyTitle} has been added to your library.`);
+        }
+    };
 
 
 const handleRead = () => {
-        
-            navigation.navigate("read");
-    }
+        if (chapters.length > 0) {
+            navigation.navigate("read", { storyId: storyId, chapterId: chapters[0].id });
+        } else {
+            Alert.alert("No Chapters", "This story has no published chapters yet.");
+        }
+    };
 
     const formatCount = (num) => {
         if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -113,7 +134,7 @@ const handleRead = () => {
         );
     }
 
-    if (!novelData) {
+    if (!storyData) {
         // This will show if the data fetch failed after loading
         return (
             <View style={[styles.container, { justifyContent: 'center' }]}>
@@ -159,11 +180,11 @@ const handleRead = () => {
             Read
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button,{backgroundColor:colors.white}]}>
-          <Text style={[styles.buttonText,{color:colors.primary}]}>
-            + Library
-          </Text>
-        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, { backgroundColor: isInLibrary ? colors.secondary : colors.white }]} onPress={handleToggleLibrary}>
+                        <Text style={[styles.buttonText, { color: isInLibrary ? colors.white : colors.primary }]}>
+                            {isInLibrary ? '✓ In Library' : '+ Library'}
+                        </Text>
+                    </TouchableOpacity>
       </View>
 
       <View style={styles.storyDescription}>
